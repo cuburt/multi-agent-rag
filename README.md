@@ -10,7 +10,7 @@ using RAG-grounded LLMs and LangGraph orchestration.
 - **Observability:** Langfuse for traces/latency/tokens/cost + custom scores (`documents_retrieved`, `citations_count`, `phi_redacted`); structlog (JSON, PHI-redacted) for log aggregation; `GET /metrics` rolls up a recent window of traces into req counts, p95 latency, error rate, and token/cost totals.
 - **Caching:** Per-tier in-memory TTL cache around the LLM call boundary — ROUTER 5 min (stable classifications), SYNTHESIS 60 s, AGENTIC disabled (live state). Env-tunable, LRU-bounded.
 - **Evals:** correctness + hallucination LLM-judge, **real hit@1 / hit@3** against gold-labeled `relevant_doc_ids`, baseline-vs-candidate diff, ten-scenario red-team pack covering cross-tenant, PHI, RBAC, prompt injection, and cross-patient tool tampering.
-- **CI:** GitHub Actions runs unit tests on every push/PR against a `pgvector` service container; a gated job runs the live red-team pack when `OPENROUTER_API_KEY` is configured as a repo secret.
+- **CI/CD:** GitHub Actions runs unit tests on every push/PR against a `pgvector` service container; a gated job runs the live red-team pack when `OPENROUTER_API_KEY` is set. On `main`, the same workflow builds a multi-tag image to Docker Hub (`cuburt4798/multi-agent-rag`) and deploys the resulting digest to Cloud Run (`us-central1`) wired to a Cloud SQL Postgres instance.
 
 ## Quick Start (Docker Compose — full stack)
 
@@ -91,9 +91,48 @@ python -m evals.red_team
 - [Diagrams](docs/diagrams/README.md) — draw.io source files for every system, graph, retrieval, model-tier, PHI-redaction, and observability diagram referenced from the docs above.
 - [Screenshots](docs/screenshots/README.md) — Streamlit UI, Swagger, and `/metrics` captures used in the executive readout. Regenerated via `scripts/capture-screenshots.py`.
 
-## CI
+## CI / CD
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs four jobs. The first two gate every push/PR; the last two only fire on pushes to `main` (or `vX.Y.Z` tags for `release`).
 
-- **`unit-tests`** — runs on every push/PR against a `pgvector/pgvector:pg16` service container. No LLM keys required; covers safety/redaction, RBAC routing, cache eviction, metrics aggregation. Always blocks merge on failure.
-- **`integration-redteam`** — gated on `OPENROUTER_API_KEY` being configured as a repo secret. Boots the API, seeds the DB, and runs `evals/red_team.py` end-to-end. Skips cleanly on forks so external contributors aren't blocked.
+| Job | Trigger | What it does |
+|---|---|---|
+| `unit-tests` | every push/PR | Spins up `pgvector/pgvector:pg16`, runs `pytest tests/`. No LLM keys required. Blocks merge on failure. |
+| `integration-redteam` | every push/PR (skips on forks/no secrets) | Boots the API, seeds the DB, runs `evals/red_team.py`. Becomes a hard gate once `OPENROUTER_API_KEY` is configured. |
+| `release` | push to `main` or `vX.Y.Z` tag | Builds linux/amd64 image with buildx (registry-cached), pushes to Docker Hub `cuburt4798/multi-agent-rag` with tags driven by the git event (see *Image versioning* below). |
+| `deploy` | push to `main` only | Deploys the immutable image **digest** (not a tag) to Cloud Run service `multi-agent-rag` in `us-central1`, attaching the `multi-agent-postgres` Cloud SQL instance via `--add-cloudsql-instances`. |
+
+### Image versioning
+
+Tags are produced by [`docker/metadata-action`](https://github.com/docker/metadata-action) from the triggering git event:
+
+| Event | Tags produced |
+|---|---|
+| Push to `main` | `:main`, `:sha-<short>`, `:latest` |
+| Push tag `v1.2.3` | `:1.2.3`, `:1.2`, `:1`, `:sha-<short>`, `:latest` |
+| PR | (release job doesn't run for PRs) |
+
+Cloud Run is pinned by `@sha256:…` digest, not tag, so a deployed revision can never silently drift if `:latest` is overwritten by a later build.
+
+### Required GitHub repository secrets
+
+| Secret | Used by | Purpose |
+|---|---|---|
+| `DOCKERHUB_TOKEN` | `release` | Docker Hub access token for `cuburt4798` |
+| `GCP_PROJECT_ID` | `deploy` | Target GCP project |
+| `GCP_SA_KEY` | `deploy` | Service-account JSON. Roles: `roles/run.admin`, `roles/iam.serviceAccountUser`, `roles/cloudsql.client` |
+| `POSTGRES_PASSWORD` | `deploy` | Cloud SQL `postgres` user password — assembled into `DATABASE_URL` at deploy time |
+| `OPENROUTER_API_KEY`, `GEMINI_API_KEY`, `VERCEL_API_KEY` | `deploy`, `integration-redteam` | LLM provider credentials |
+| `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` | `deploy`, `integration-redteam` | Trace pipeline |
+
+### Cloud Run runtime config
+
+The deploy job builds a `DATABASE_URL` of the form `postgresql://postgres:<urlencoded>@/multi-agent-db?host=/cloudsql/<project>:us-central1:multi-agent-postgres` so both `psycopg2` (SQLModel) and `psycopg3` (langgraph checkpointer) connect through the auth-proxy unix socket Cloud Run mounts. The service runs with `--allow-unauthenticated`, `--port=8000`, `--memory=1Gi`, `--cpu=1`, `--min-instances=0`, `--max-instances=3`.
+
+### Cutting a versioned release
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+# release job publishes :0.1.0, :0.1, :0, :sha-<short>, :latest
+# deploy does NOT run for tag pushes — merge to main to ship.
+```
