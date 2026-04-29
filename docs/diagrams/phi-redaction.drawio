@@ -1,0 +1,100 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="phi" name="Three-Layer PHI Redaction">
+    <mxGraphModel dx="1468" dy="990" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="700" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontStyle=1;fontSize=18;" value="PHI Redaction — Defence in Depth (3 Layers)" vertex="1">
+          <mxGeometry height="30" width="1400" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="One regex (US SSN) is shared by all three layers. src/safety.py" vertex="1">
+          <mxGeometry height="20" width="1400" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="row1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#dddddd;" value="" vertex="1">
+          <mxGeometry height="140" width="1320" x="40" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="lyr1_label" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=13;fontColor=#666666;" value="Layer 1 — Inbound message" vertex="1">
+          <mxGeometry height="25" width="300" x="60" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="user_in" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;verticalAlign=middle;" value="POST /ask, /agent&#xa;{ &quot;query&quot;: &quot;... 123-45-6789 ...&quot; }" vertex="1">
+          <mxGeometry height="70" width="280" x="60" y="155" as="geometry" />
+        </mxCell>
+        <mxCell id="safety_node" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;verticalAlign=middle;" value="safety_node&#xa;(graph entry)&#xa;regex SSN_PATTERN" vertex="1">
+          <mxGeometry height="70" width="240" x="450" y="155" as="geometry" />
+        </mxCell>
+        <mxCell id="downstream" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;verticalAlign=middle;" value="downstream nodes&#xa;(planner / retrieve / billing /&#xa;scheduler / staff)" vertex="1">
+          <mxGeometry height="70" width="280" x="770" y="155" as="geometry" />
+        </mxCell>
+        <mxCell id="phi_log" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;verticalAlign=middle;dashed=1;" value="warn: phi_redacted_from_input&#xa;(structlog event)" vertex="1">
+          <mxGeometry height="70" width="200" x="1140" y="155" as="geometry" />
+        </mxCell>
+        <mxCell id="ie_user_safety" edge="1" parent="1" source="user_in" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=classic;" target="safety_node">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ie_safety_downstream" edge="1" parent="1" source="safety_node" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=classic;fontSize=10;" target="downstream" value="sanitised">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ie_safety_log" edge="1" parent="1" source="downstream" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=classic;dashed=1;fontSize=10;" target="phi_log" value="if redacted">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="row2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#dddddd;" value="" vertex="1">
+          <mxGeometry height="140" width="1320" x="40" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="lyr2_label" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=13;fontColor=#666666;" value="Layer 2 — Every log record" vertex="1">
+          <mxGeometry height="25" width="300" x="60" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="any_log" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;verticalAlign=middle;" value="any structlog event&#xa;{ ...string fields... }" vertex="1">
+          <mxGeometry height="70" width="240" x="60" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="processor" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;verticalAlign=middle;" value="redact_phi_processor&#xa;(structlog processor)&#xa;scrubs every str field" vertex="1">
+          <mxGeometry height="70" width="240" x="380" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="json_out" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;verticalAlign=middle;" value="JSONRenderer&#xa;{ ...&quot;[REDACTED SSN]&quot;... }" vertex="1">
+          <mxGeometry height="70" width="240" x="700" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="agg" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;verticalAlign=middle;" value="log aggregator&#xa;(Datadog / Loki / stdout)" vertex="1">
+          <mxGeometry height="70" width="240" x="1020" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="le_any_proc" edge="1" parent="1" source="any_log" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=classic;" target="processor">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="le_proc_json" edge="1" parent="1" source="processor" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=classic;" target="json_out">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="le_json_agg" edge="1" parent="1" source="json_out" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=classic;" target="agg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="row3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#dddddd;" value="" vertex="1">
+          <mxGeometry height="160" width="1320" x="40" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="lyr3_label" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=13;fontColor=#666666;" value="Layer 3 — Outbound response" vertex="1">
+          <mxGeometry height="25" width="300" x="60" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="graph_out" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;verticalAlign=middle;" value="summarizer_node&#xa;final AIMessage" vertex="1">
+          <mxGeometry height="70" width="240" x="60" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="handler" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;verticalAlign=middle;" value="_run_agent (api/agent_routes.py)&#xa;redact_phi_text(final_message)" vertex="1">
+          <mxGeometry height="70" width="280" x="380" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="resp" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;verticalAlign=middle;" value="HTTP 200&#xa;{ &quot;answer&quot;: &quot;...[REDACTED SSN]...&quot;,&#xa;  &quot;citations&quot;: [...] }" vertex="1">
+          <mxGeometry height="70" width="280" x="740" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="score" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;verticalAlign=middle;dashed=1;" value="Langfuse score&#xa;phi_redacted = 1.0&#xa;(if scrub altered output)" vertex="1">
+          <mxGeometry height="70" width="220" x="1120" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="oe_graph_handler" edge="1" parent="1" source="graph_out" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=classic;" target="handler">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oe_handler_resp" edge="1" parent="1" source="handler" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=classic;" target="resp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oe_handler_score" edge="1" parent="1" source="resp" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=classic;dashed=1;fontSize=10;" target="score" value="if scrub altered">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="footer" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=11;verticalAlign=middle;align=center;" value="Production should swap the SSN regex for Microsoft Presidio or a guardrail model — current scrubber misses MRNs, DOBs, addresses, and phone numbers." vertex="1">
+          <mxGeometry height="40" width="1320" x="40" y="630" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

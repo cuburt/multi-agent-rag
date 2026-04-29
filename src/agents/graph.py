@@ -1,170 +1,313 @@
+"""Wires up the two LangGraph workflows and the LLM client they share.
+
+There are two graphs sitting on the same AgentState and Postgres checkpointer:
+
+  agent_app  (POST /agent)  safety -> planner -> tool -> summarize
+  ask_app    (POST /ask)    safety -> ask_classify -> read-only tool -> summarize
+
+/ask deliberately skips the planner and any tool that can mutate data, so even
+if the classifier picks the wrong branch we can never accidentally book or
+cancel something. Each node also re-checks RBAC, so we're not relying on the
+router for safety. The full reasoning lives in docs/design.md.
+
+LLM calls go through three tiers — ROUTER, AGENTIC, SYNTHESIS — each with its
+own fallback chain. The primary model per tier can be swapped via env vars
+(see .env.example).
+"""
+
+import hashlib
 import os
-import re
-from typing import TypedDict, Annotated, Sequence, List
-import operator
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
+import time
+from collections import OrderedDict
+from typing import List, Optional
+
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_community.chat_models import ChatLiteLLM
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+import structlog
+
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 from langgraph.graph import StateGraph, END
-from litellm import completion
-import litellm
+from langgraph.checkpoint.postgres import PostgresSaver
 
-from src.rag.retriever import retrieve_documents
-from src.tools.scheduler import check_appointments, schedule_appointment
-from src.tools.billing import check_claim_status
+from src.agents.state import AgentState
 
-# Ensure litellm behaves consistently
+logger = structlog.get_logger(__name__)
+
 os.environ["LITELLM_LOG"] = "INFO"
 
-# Inject Langfuse tracing
-litellm.success_callback = ["langfuse"]
-litellm.failure_callback = ["langfuse"]
 
-class AgentState(TypedDict):
-    messages: Annotated[Sequence[BaseMessage], operator.add]
-    tenant_id: str
-    patient_id: str
-    user_role: str
-    citations: list[str]
-    next_step: str
-    scratchpad: str
+# --- Model tiers + fallback chains -----------------------------------------
 
-def get_llm_response(messages: List[dict]) -> str:
-    """Wrapper for litellm completion."""
-    model = os.getenv("LITELLM_MODEL", "gemini/gemini-1.5-flash")
-    try:
-        response = completion(
-            model=model,
-            messages=messages,
-            temperature=0.0
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        print(f"LLM Error: {e}")
-        return "I'm sorry, I encountered an error communicating with the language model."
+ROUTER = "router"
+AGENTIC = "agentic"
+SYNTHESIS = "synthesis"
 
-def safety_node(state: AgentState) -> dict:
-    """Checks for harmful intent and scrubs PHI from the input if necessary."""
-    last_msg = state["messages"][-1].content
-    
-    # Basic PHI detection (e.g., SSN pattern)
-    # In a real system, use Presidio or a dedicated LLM guardrail
-    sanitized_msg = re.sub(r'\b\d{3}-\d{2}-\d{4}\b', '[REDACTED SSN]', last_msg)
-    
-    if sanitized_msg != last_msg:
-        print("Safety Agent: PHI detected and redacted.")
-        
-    return {"messages": [HumanMessage(content=sanitized_msg)]}
+MODEL_CHAINS: dict[str, list[str]] = {
+    ROUTER: [
+        os.getenv("ROUTER_MODEL", "openrouter/meta-llama/llama-3.2-3b-instruct:free"),
+        "openrouter/liquid/lfm-2.5-1.2b-thinking:free",
+        "openrouter/meta-llama/llama-3.3-70b-instruct:free",
+        "vercel/openai/gpt-4o-mini",
+    ],
+    AGENTIC: [
+        os.getenv("AGENTIC_MODEL", "openrouter/openai/gpt-oss-120b:free"),
+        "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+        "openrouter/tencent/hy3-preview:free",
+        "openrouter/meta-llama/llama-3.3-70b-instruct:free",
+        "vercel/anthropic/claude-haiku-4-5",
+    ],
+    SYNTHESIS: [
+        os.getenv("SYNTHESIS_MODEL", "openrouter/nousresearch/hermes-3-llama-3.1-405b:free"),
+        "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+        "openrouter/meta-llama/llama-3.3-70b-instruct:free",
+        "vercel/anthropic/claude-sonnet-4-6",
+    ],
+}
 
-def planner_node(state: AgentState) -> dict:
-    """Decides the next course of action."""
-    last_msg = state["messages"][-1].content
-    sys_prompt = f"""You are a routing agent for a dental clinic assistant. 
-    Analyze the user's request: "{last_msg}"
-    Decide the NEXT BEST action from these choices:
-    - 'retrieve': If the user asks about clinic policies, instructions, or general information.
-    - 'billing': If the user asks about their claims, bills, or balances.
-    - 'schedule': If the user wants to check or create an appointment.
-    - 'summarize': If no tool is needed or the request is just a greeting.
-    Output ONLY the action word.
+_VERCEL_AI_GATEWAY_BASE = "https://ai-gateway.vercel.sh/v1"
+_llm_cache: dict[str, ChatLiteLLM] = {}
+
+# When OpenRouter's account-wide free-tier cap trips, every :free model on the
+# account starts 429ing at once. Walking the chain just burns latency, so once
+# we see it we mark a short cooldown and skip every openrouter/* entry until
+# it expires.
+_OPENROUTER_COOLDOWN_SECONDS = 60.0
+_openrouter_skip_until: float = 0.0
+
+
+def _get_llm(model: str) -> ChatLiteLLM:
+    if model not in _llm_cache:
+        # max_retries=0 lets a 429 bubble straight up to our own chain logic
+        # instead of ChatLiteLLM looping internally for ~30s.
+        kwargs: dict = {"model": model, "temperature": 0.0, "max_tokens": 1024, "max_retries": 0}
+        if model.startswith("vercel/"):
+            # ChatLiteLLM accepts an api_key but never actually forwards it to
+            # litellm.completion. model_kwargs is the only path that does.
+            kwargs["model"] = "openai/" + model[len("vercel/"):]
+            kwargs["api_base"] = _VERCEL_AI_GATEWAY_BASE
+            kwargs["model_kwargs"] = {"api_key": os.getenv("VERCEL_API_KEY")}
+        _llm_cache[model] = ChatLiteLLM(**kwargs)
+    return _llm_cache[model]
+
+
+def _invoke_with_retry(model: str, lc_messages: list) -> str:
+    """One call with two retries on transient errors. Rate limits skip the
+    retry — the next model in the chain is a better bet than waiting.
     """
-    
-    resp = get_llm_response([{"role": "system", "content": sys_prompt}])
-    action = resp.strip().lower()
-    
-    # fallback
-    if action not in ['retrieve', 'billing', 'schedule', 'summarize']:
-        action = 'summarize'
-        
-    return {"next_step": action}
+    llm = _get_llm(model)
 
-def retriever_node(state: AgentState) -> dict:
-    """Retrieves documents using RAG."""
-    query = state["messages"][-1].content
-    docs = retrieve_documents(query=query, tenant_id=state["tenant_id"], top_k=2)
-    
-    citations = []
-    context_str = ""
-    for d in docs:
-        citations.append(f"Doc {d['id']}: {d['title']}")
-        context_str += f"Title: {d['title']}\nContent: {d['content']}\n\n"
-        
-    scratchpad = state.get("scratchpad", "") + f"\n[RAG Context]\n{context_str}\n"
-    
-    return {"scratchpad": scratchpad, "citations": citations}
+    @retry(
+        stop=stop_after_attempt(2),
+        wait=wait_exponential(multiplier=1, min=1, max=5),
+        retry=retry_if_exception(lambda e: "RateLimitError" not in type(e).__name__),
+        reraise=True,
+    )
+    def _call() -> str:
+        # `model` is the original chain entry ("vercel/openai/gpt-4o-mini",
+        # "openrouter/...", etc.). _get_llm rewrites Vercel entries to the
+        # litellm-dispatch form, so Langfuse would otherwise log the rewritten
+        # name and lose the routing context. Surface the original label as
+        # metadata on the generation span.
+        return llm.invoke(
+            lc_messages,
+            config={"metadata": {"logical_model": model}},
+        ).content
 
-def billing_node(state: AgentState) -> dict:
-    """Checks billing and claims."""
-    if state["user_role"] != "patient" and state["user_role"] != "staff":
-        scratchpad = state.get("scratchpad", "") + "\n[Billing] Access Denied.\n"
-        return {"scratchpad": scratchpad}
-        
-    claims_info = check_claim_status(state["tenant_id"], state["patient_id"])
-    scratchpad = state.get("scratchpad", "") + f"\n[Billing Context]\n{claims_info}\n"
-    return {"scratchpad": scratchpad}
+    return _call()
 
-def scheduler_node(state: AgentState) -> dict:
-    """Checks or creates appointments."""
-    # Simplified: We just check appointments for now.
-    # In a full version, we'd use an LLM to extract dates and call schedule_appointment.
-    apt_info = check_appointments(state["tenant_id"], state["patient_id"])
-    scratchpad = state.get("scratchpad", "") + f"\n[Schedule Context]\n{apt_info}\n"
-    return {"scratchpad": scratchpad}
 
-def summarizer_node(state: AgentState) -> dict:
-    """Synthesizes the final answer using evidence."""
-    last_msg = state["messages"][-1].content
-    scratchpad = state.get("scratchpad", "")
-    citations = state.get("citations", [])
-    
-    sys_prompt = f"""You are a helpful dental assistant.
-    Answer the user's request using ONLY the provided Context.
-    If the context doesn't contain the answer, say "I don't have enough information to answer that."
-    Ensure no Sensitive Patient Data (PHI like SSNs) is leaked in the output.
-    
-    Context:
-    {scratchpad}
+# --- TTL response cache (per tier) -----------------------------------------
+# Identical prompts inside a tier get served from a process-local LRU.
+# AGENTIC defaults to 0 because its prompt embeds the patient's live
+# appointment list — a cache hit there would happily hand back stale data.
+
+LLM_CACHE_TTL_SECONDS: dict[str, float] = {
+    ROUTER: float(os.getenv("LLM_CACHE_TTL_ROUTER_S", "300")),
+    SYNTHESIS: float(os.getenv("LLM_CACHE_TTL_SYNTHESIS_S", "60")),
+    AGENTIC: float(os.getenv("LLM_CACHE_TTL_AGENTIC_S", "0")),
+}
+LLM_CACHE_MAX_ENTRIES = int(os.getenv("LLM_CACHE_MAX_ENTRIES", "256"))
+_llm_response_cache: "OrderedDict[tuple, tuple[float, str]]" = OrderedDict()
+
+
+def _cache_key(tier: str, messages: List[dict]) -> tuple:
+    blob = "".join(f"{m.get('role','')}{m.get('content','')}" for m in messages)
+    digest = hashlib.sha1(blob.encode("utf-8")).hexdigest()
+    return (tier, digest)
+
+
+def _cache_get(key: tuple, ttl: float) -> Optional[str]:
+    if ttl <= 0:
+        return None
+    entry = _llm_response_cache.get(key)
+    if entry is None:
+        return None
+    expires_at, value = entry
+    if expires_at < time.time():
+        _llm_response_cache.pop(key, None)
+        return None
+    _llm_response_cache.move_to_end(key)
+    return value
+
+
+def _cache_put(key: tuple, value: str, ttl: float) -> None:
+    if ttl <= 0:
+        return
+    _llm_response_cache[key] = (time.time() + ttl, value)
+    _llm_response_cache.move_to_end(key)
+    while len(_llm_response_cache) > LLM_CACHE_MAX_ENTRIES:
+        _llm_response_cache.popitem(last=False)
+
+
+def _to_lc_messages(messages: List[dict]) -> list:
+    lc = []
+    for m in messages:
+        role = m["role"]
+        if role == "system":
+            lc.append(SystemMessage(content=m["content"]))
+        elif role == "user":
+            lc.append(HumanMessage(content=m["content"]))
+        elif role == "assistant":
+            lc.append(AIMessage(content=m["content"]))
+    return lc
+
+
+def get_llm_response(messages: List[dict], tier: str = SYNTHESIS) -> str:
+    """Run the prompt through the tier's chain, falling back model by model
+    until something answers. Returns a generic apology if the whole chain fails.
     """
-    
-    resp = get_llm_response([
-        {"role": "system", "content": sys_prompt},
-        {"role": "user", "content": last_msg}
-    ])
-    
-    # Append citations if any
-    if citations:
-        resp += "\n\nSources:\n" + "\n".join(citations)
-        
-    return {"messages": [AIMessage(content=resp)]}
+    global _openrouter_skip_until
 
-def route_next(state: AgentState):
-    return state["next_step"]
+    ttl = LLM_CACHE_TTL_SECONDS.get(tier, 0.0)
+    key = _cache_key(tier, messages)
+    cached = _cache_get(key, ttl)
+    if cached is not None:
+        logger.info("llm_cache_hit", tier=tier)
+        return cached
 
-# Build the Graph
-workflow = StateGraph(AgentState)
+    lc_messages = _to_lc_messages(messages)
+    chain = MODEL_CHAINS.get(tier, MODEL_CHAINS[SYNTHESIS])
+    last_error: Optional[Exception] = None
+    skip_openrouter = time.time() < _openrouter_skip_until
 
-workflow.add_node("safety", safety_node)
-workflow.add_node("planner", planner_node)
-workflow.add_node("retrieve", retriever_node)
-workflow.add_node("billing", billing_node)
-workflow.add_node("schedule", scheduler_node)
-workflow.add_node("summarize", summarizer_node)
+    for model in chain:
+        if skip_openrouter and model.startswith("openrouter/"):
+            continue
+        try:
+            result = _invoke_with_retry(model, lc_messages)
+            if model != chain[0]:
+                logger.info("llm_fallback_succeeded", tier=tier, model=model)
+            _cache_put(key, result, ttl)
+            return result
+        except Exception as e:
+            last_error = e
+            logger.warning("llm_model_failed", tier=tier, model=model, error=str(e))
+            if "free-models-per-min" in str(e):
+                _openrouter_skip_until = time.time() + _OPENROUTER_COOLDOWN_SECONDS
+                skip_openrouter = True
+                logger.warning(
+                    "openrouter_global_rate_limit_tripped",
+                    tier=tier,
+                    cool_down_s=_OPENROUTER_COOLDOWN_SECONDS,
+                )
 
-workflow.set_entry_point("safety")
-workflow.add_edge("safety", "planner")
+    logger.error("all_llm_models_failed", tier=tier, error=str(last_error))
+    return "I'm sorry, I encountered an error communicating with the language model."
 
-workflow.add_conditional_edges(
-    "planner",
+
+# --- Workflow assembly ------------------------------------------------------
+# Nodes import get_llm_response and the tier constants from this module, so
+# we have to wait until they're defined before pulling the nodes in. The
+# late import is intentional, not a lint accident.
+from src.agents.nodes import (  # noqa: E402
+    safety_node,
+    planner_node,
+    ask_classifier_node,
+    retriever_node,
+    appointments_lookup_node,
+    availability_lookup_node,
+    billing_node,
+    staff_lookup_node,
+    scheduler_node,
+    summarizer_node,
     route_next,
-    {
-        "retrieve": "retrieve",
-        "billing": "billing",
-        "schedule": "schedule",
-        "summarize": "summarize"
-    }
 )
 
-workflow.add_edge("retrieve", "summarize")
-workflow.add_edge("billing", "summarize")
-workflow.add_edge("schedule", "summarize")
-workflow.add_edge("summarize", END)
 
-agent_app = workflow.compile()
+# Postgres-backed checkpointer. The pool is created closed (`open=False`) so
+# importing this module never reaches for the database — main.py opens it in
+# its startup hook, alongside init_db() and checkpointer.setup().
+_DB_URI = os.getenv(
+    "DATABASE_URL",
+    "postgresql://dental_admin:dental_pass@localhost:5432/dental_rag",
+)
+checkpoint_pool = ConnectionPool(
+    conninfo=_DB_URI,
+    max_size=10,
+    open=False,
+    kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+)
+checkpointer = PostgresSaver(conn=checkpoint_pool)
+
+
+def _build_agent_app():
+    wf = StateGraph(AgentState)
+    wf.add_node("safety", safety_node)
+    wf.add_node("planner", planner_node)
+    wf.add_node("retrieve", retriever_node)
+    wf.add_node("billing", billing_node)
+    wf.add_node("schedule", scheduler_node)
+    wf.add_node("staff", staff_lookup_node)
+    wf.add_node("summarize", summarizer_node)
+    wf.set_entry_point("safety")
+    wf.add_edge("safety", "planner")
+    wf.add_conditional_edges(
+        "planner",
+        route_next,
+        {
+            "retrieve": "retrieve",
+            "billing": "billing",
+            "schedule": "schedule",
+            "staff": "staff",
+            "summarize": "summarize",
+        },
+    )
+    for branch in ("retrieve", "billing", "schedule", "staff"):
+        wf.add_edge(branch, "summarize")
+    wf.add_edge("summarize", END)
+    return wf.compile(checkpointer=checkpointer)
+
+
+def _build_ask_app():
+    wf = StateGraph(AgentState)
+    wf.add_node("safety", safety_node)
+    wf.add_node("ask_classify", ask_classifier_node)
+    wf.add_node("retrieve", retriever_node)
+    wf.add_node("appointments", appointments_lookup_node)
+    wf.add_node("availability", availability_lookup_node)
+    wf.add_node("billing", billing_node)
+    wf.add_node("staff", staff_lookup_node)
+    wf.add_node("summarize", summarizer_node)
+    wf.set_entry_point("safety")
+    wf.add_edge("safety", "ask_classify")
+    wf.add_conditional_edges(
+        "ask_classify",
+        route_next,
+        {
+            "retrieve": "retrieve",
+            "appointments": "appointments",
+            "availability": "availability",
+            "billing": "billing",
+            "staff": "staff",
+        },
+    )
+    for branch in ("retrieve", "appointments", "availability", "billing", "staff"):
+        wf.add_edge(branch, "summarize")
+    wf.add_edge("summarize", END)
+    return wf.compile(checkpointer=checkpointer)
+
+
+agent_app = _build_agent_app()
+ask_app = _build_ask_app()
