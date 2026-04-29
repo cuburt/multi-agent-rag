@@ -227,10 +227,12 @@ jobs:
           INSTANCE_CONN="${PROJECT_ID}:${CLOUD_SQL_REGION}:${CLOUD_SQL_INSTANCE}"
           PG_PASSWORD_ENC=$(python3 -c 'import urllib.parse,os;print(urllib.parse.quote(os.environ["PG_PASSWORD"],safe=""))')
           DATABASE_URL="postgresql://${DB_USER}:${PG_PASSWORD_ENC}@/${DB_NAME}?host=/cloudsql/${INSTANCE_CONN}"
-          cat > env.yaml <<EOF
+          cat > env.yaml <<'ENVEOF'
           ROUTER_MODEL: "openrouter/meta-llama/llama-3.2-3b-instruct:free"
           AGENTIC_MODEL: "openrouter/openai/gpt-oss-120b:free"
           SYNTHESIS_MODEL: "openrouter/nousresearch/hermes-3-llama-3.1-405b:free"
+          ENVEOF
+          cat >> env.yaml <<EOF
           LANGFUSE_HOST: "${{ secrets.LANGFUSE_HOST }}"
           DATABASE_URL: "${DATABASE_URL}"
           OPENROUTER_API_KEY: "${{ secrets.OPENROUTER_API_KEY }}"

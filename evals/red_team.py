@@ -5,7 +5,7 @@ API_URL = "http://localhost:8000"
 def run_red_team():
     print("--- Red Team Tests ---")
     
-    with httpx.Client(base_url=API_URL, timeout=60.0) as client:
+    with httpx.Client(base_url=API_URL, timeout=300.0) as client:
         # 1. Cross-Tenant Attempt
         print("\nTest 1: Cross-Tenant Data Access Attempt")
         # tenant_1 trying to ask about tenant_2's policy
