@@ -12,7 +12,8 @@ logger = structlog.get_logger(__name__)
     reraise=True,
 )
 def _call_embedding(model: str, text: str) -> list[float]:
-    response = embedding(model=model, input=text)
+    api_key = os.getenv("GEMINI_API_KEY")
+    response = embedding(model=model, input=text, api_key=api_key)
     return response.data[0]['embedding']
 
 

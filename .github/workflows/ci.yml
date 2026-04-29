@@ -76,6 +76,7 @@ jobs:
       DATABASE_URL: postgresql://dental_admin:dental_pass@localhost:5432/dental_rag
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       VERCEL_API_KEY: ${{ secrets.VERCEL_API_KEY }}
       LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
       LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
@@ -233,6 +234,7 @@ jobs:
           DATABASE_URL: "${DATABASE_URL}"
           OPENROUTER_API_KEY: "${{ secrets.OPENROUTER_API_KEY }}"
           GEMINI_API_KEY: "${{ secrets.GEMINI_API_KEY }}"
+          GOOGLE_API_KEY: "${{ secrets.GEMINI_API_KEY }}"
           VERCEL_API_KEY: "${{ secrets.VERCEL_API_KEY }}"
           LANGFUSE_PUBLIC_KEY: "${{ secrets.LANGFUSE_PUBLIC_KEY }}"
           LANGFUSE_SECRET_KEY: "${{ secrets.LANGFUSE_SECRET_KEY }}"
