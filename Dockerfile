@@ -16,7 +16,9 @@ COPY evals ./evals
 COPY scripts ./scripts
 COPY docs ./docs
 
+ENV PORT=8000
 EXPOSE 8000
 
-# Default command — overridable from docker-compose.
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Honor $PORT so the same image runs under docker-compose (PORT=8000) and
+# Cloud Run (PORT injected by the platform, default 8080).
+CMD ["sh", "-c", "uvicorn src.main:app --host 0.0.0.0 --port ${PORT}"]

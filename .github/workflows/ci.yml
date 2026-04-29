@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*.*.*']
   pull_request:
     branches: [main]
 
@@ -126,3 +127,129 @@ jobs:
         if: always() && steps.gate.outputs.skip != 'true'
         run: |
           if [ -f .api.pid ]; then kill "$(cat .api.pid)" || true; fi
+
+  release:
+    name: Build and push image to Docker Hub
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    # Build on main pushes and on semver tag pushes (vX.Y.Z).
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    permissions:
+      contents: read
+    outputs:
+      # Immutable, content-addressable reference the deploy job pins to.
+      image_ref: cuburt4798/multi-agent-rag@${{ steps.build.outputs.digest }}
+      primary_tag: ${{ steps.meta.outputs.version }}
+    env:
+      IMAGE: cuburt4798/multi-agent-rag
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: cuburt4798
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Generates the tag set from the git event:
+      #   push to main      -> :main, :sha-<short>, :latest
+      #   git tag v1.2.3    -> :1.2.3, :1.2, :1, :sha-<short>, :latest
+      #   PR (won't run)    -> would be :pr-<n>
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+
+  deploy:
+    name: Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    needs: release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+
+    env:
+      SERVICE: multi-agent-rag
+      REGION: us-central1
+      # Pinned by digest, not tag — the deployed revision can never drift
+      # from the image that was tested in this run.
+      IMAGE: docker.io/${{ needs.release.outputs.image_ref }}
+      # Cloud SQL: instance, db, user. Password comes from POSTGRES_PASSWORD secret.
+      CLOUD_SQL_INSTANCE: multi-agent-postgres
+      CLOUD_SQL_REGION: us-central1
+      DB_NAME: multi-agent-db
+      DB_USER: postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      # Build a DATABASE_URL that connects through the Cloud SQL Auth
+      # Proxy unix socket Cloud Run mounts when --add-cloudsql-instances
+      # is set. Format works for both psycopg2 (SQLModel) and psycopg3
+      # (langgraph checkpointer). Password is URL-encoded so any special
+      # chars in POSTGRES_PASSWORD don't break the URI.
+      - name: Build env file
+        env:
+          PG_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          umask 077
+          INSTANCE_CONN="${PROJECT_ID}:${CLOUD_SQL_REGION}:${CLOUD_SQL_INSTANCE}"
+          PG_PASSWORD_ENC=$(python3 -c 'import urllib.parse,os;print(urllib.parse.quote(os.environ["PG_PASSWORD"],safe=""))')
+          DATABASE_URL="postgresql://${DB_USER}:${PG_PASSWORD_ENC}@/${DB_NAME}?host=/cloudsql/${INSTANCE_CONN}"
+          cat > env.yaml <<EOF
+          ROUTER_MODEL: "openrouter/meta-llama/llama-3.2-3b-instruct:free"
+          AGENTIC_MODEL: "openrouter/openai/gpt-oss-120b:free"
+          SYNTHESIS_MODEL: "openrouter/nousresearch/hermes-3-llama-3.1-405b:free"
+          LANGFUSE_HOST: "${{ secrets.LANGFUSE_HOST }}"
+          DATABASE_URL: "${DATABASE_URL}"
+          OPENROUTER_API_KEY: "${{ secrets.OPENROUTER_API_KEY }}"
+          GEMINI_API_KEY: "${{ secrets.GEMINI_API_KEY }}"
+          VERCEL_API_KEY: "${{ secrets.VERCEL_API_KEY }}"
+          LANGFUSE_PUBLIC_KEY: "${{ secrets.LANGFUSE_PUBLIC_KEY }}"
+          LANGFUSE_SECRET_KEY: "${{ secrets.LANGFUSE_SECRET_KEY }}"
+          EOF
+          echo "instance_conn=${INSTANCE_CONN}" >> "$GITHUB_ENV"
+
+      - name: Deploy
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --image="$IMAGE" \
+            --region="$REGION" \
+            --platform=managed \
+            --allow-unauthenticated \
+            --port=8000 \
+            --memory=1Gi \
+            --cpu=1 \
+            --min-instances=0 \
+            --max-instances=3 \
+            --add-cloudsql-instances="$instance_conn" \
+            --env-vars-file=env.yaml
