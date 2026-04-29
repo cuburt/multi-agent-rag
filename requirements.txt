@@ -11,6 +11,7 @@ langchain-core==0.2.43
 langgraph==0.2.74
 langgraph-checkpoint-postgres==2.0.5
 litellm==1.41.0
+google-genai==1.73.1
 langfuse==2.38.0
 structlog==24.2.0
 pydantic==2.8.0

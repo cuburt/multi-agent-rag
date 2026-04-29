@@ -22,7 +22,7 @@ class Document(SQLModel, table=True):
     content: str
     doc_type: str  # 'policy' | 'patient_record' | 'insurance_guideline'
     effective_date: Optional[date] = None
-    embedding: Optional[Any] = Field(sa_column=Column(Vector(768)))
+    embedding: Optional[Any] = Field(sa_column=Column(Vector(3072)))
     
 class Appointment(SQLModel, table=True):
     id: str = Field(primary_key=True)
