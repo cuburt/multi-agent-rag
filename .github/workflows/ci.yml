@@ -191,6 +191,7 @@ jobs:
 
     env:
       SERVICE: multi-agent-rag
+      FRONTEND_SERVICE: multi-agent-frontend
       REGION: us-central1
       # Pinned by digest, not tag — the deployed revision can never drift
       # from the image that was tested in this run.
@@ -241,7 +242,7 @@ jobs:
           EOF
           echo "instance_conn=${INSTANCE_CONN}" >> "$GITHUB_ENV"
 
-      - name: Deploy
+      - name: Deploy API
         run: |
           gcloud run deploy "$SERVICE" \
             --image="$IMAGE" \
@@ -255,3 +256,24 @@ jobs:
             --max-instances=3 \
             --add-cloudsql-instances="$instance_conn" \
             --env-vars-file=env.yaml
+
+      - name: Get API URL
+        run: |
+          API_URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'value(status.url)')
+          echo "API_URL=$API_URL" >> "$GITHUB_ENV"
+
+      - name: Deploy Frontend
+        run: |
+          gcloud run deploy "$FRONTEND_SERVICE" \
+            --image="$IMAGE" \
+            --region="$REGION" \
+            --platform=managed \
+            --allow-unauthenticated \
+            --port=8080 \
+            --memory=1Gi \
+            --cpu=1 \
+            --min-instances=0 \
+            --max-instances=3 \
+            --command="streamlit" \
+            --args="run,frontend/app.py,--server.port=8080,--server.address=0.0.0.0" \
+            --set-env-vars="API_URL=$API_URL"
