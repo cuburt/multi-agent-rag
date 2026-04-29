@@ -1,0 +1,175 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="graphs" name="Two LangGraph Workflows">
+    <mxGraphModel dx="1468" dy="990" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontStyle=1;fontSize=18;" value="Two Compiled LangGraph Workflows" vertex="1">
+          <mxGeometry height="40" width="1400" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="bg_agent" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#cccccc;" value="" vertex="1">
+          <mxGeometry height="780" width="640" x="40" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ttl_agent" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontStyle=1;fontSize=14;" value="agent_app  —  POST /agent" vertex="1">
+          <mxGeometry height="30" width="640" x="40" y="95" as="geometry" />
+        </mxCell>
+        <mxCell id="ttl_agent_sub" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=11;fontColor=#666666;" value="full multi-tool flow with mutating actions" vertex="1">
+          <mxGeometry height="20" width="640" x="40" y="125" as="geometry" />
+        </mxCell>
+        <mxCell id="a_safety" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;verticalAlign=middle;" value="safety" vertex="1">
+          <mxGeometry height="50" width="180" x="270" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="a_planner" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;verticalAlign=middle;" value="planner&#xa;ROUTER tier" vertex="1">
+          <mxGeometry height="60" width="180" x="270" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="a_retrieve" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;verticalAlign=middle;" value="retrieve" vertex="1">
+          <mxGeometry height="50" width="120" x="70" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="a_billing" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;verticalAlign=middle;" value="billing&#xa;(RBAC)" vertex="1">
+          <mxGeometry height="50" width="120" x="210" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="a_schedule" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;verticalAlign=middle;" value="schedule&#xa;AGENTIC tier" vertex="1">
+          <mxGeometry height="50" width="140" x="350" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="a_staff" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;verticalAlign=middle;" value="staff&#xa;(RBAC)" vertex="1">
+          <mxGeometry height="50" width="120" x="510" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="a_summarize" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;verticalAlign=middle;fontStyle=1;" value="summarize&#xa;SYNTHESIS tier · evidence-only" vertex="1">
+          <mxGeometry height="60" width="280" x="220" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="a_end" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;verticalAlign=middle;" value="END" vertex="1">
+          <mxGeometry height="50" width="80" x="320" y="660" as="geometry" />
+        </mxCell>
+        <mxCell id="ae_safety_planner" edge="1" parent="1" source="a_safety" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="a_planner">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae_planner_retrieve" edge="1" parent="1" source="a_planner" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="a_retrieve">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae_planner_billing" edge="1" parent="1" source="a_planner" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="a_billing">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae_planner_schedule" edge="1" parent="1" source="a_planner" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="a_schedule">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae_planner_staff" edge="1" parent="1" source="a_planner" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="a_staff">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae_retrieve_sum" edge="1" parent="1" source="a_retrieve" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="a_summarize">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae_billing_sum" edge="1" parent="1" source="a_billing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.35;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="a_summarize">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae_schedule_sum" edge="1" parent="1" source="a_schedule" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.65;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="a_summarize">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae_staff_sum" edge="1" parent="1" source="a_staff" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.9;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="a_summarize">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae_sum_end" edge="1" parent="1" source="a_summarize" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="a_end">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae_planner_sum" edge="1" parent="1" source="a_planner" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;endArrow=classic;dashed=1;fontSize=10;curved=0;" target="a_summarize" value="summarize&#xa;(direct, e.g. greeting)">
+          <mxGeometry relative="1" x="-0.129" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="650" y="300" />
+              <mxPoint x="650" y="570" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bg_ask" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#cccccc;" value="" vertex="1">
+          <mxGeometry height="780" width="640" x="720" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ttl_ask" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontStyle=1;fontSize=14;" value="ask_app  —  POST /ask" vertex="1">
+          <mxGeometry height="30" width="640" x="720" y="95" as="geometry" />
+        </mxCell>
+        <mxCell id="ttl_ask_sub" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=11;fontColor=#666666;" value="lean read-only Q&amp;A — no mutating branches" vertex="1">
+          <mxGeometry height="20" width="640" x="720" y="125" as="geometry" />
+        </mxCell>
+        <mxCell id="b_safety" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;verticalAlign=middle;" value="safety" vertex="1">
+          <mxGeometry height="50" width="180" x="950" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="b_classify" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;verticalAlign=middle;" value="ask_classify&#xa;ROUTER tier" vertex="1">
+          <mxGeometry height="60" width="180" x="950" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="b_retrieve" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;verticalAlign=middle;" value="retrieve" vertex="1">
+          <mxGeometry height="50" width="80" x="740" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="b_appts" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;verticalAlign=middle;" value="appointments&#xa;(RBAC)" vertex="1">
+          <mxGeometry height="50" width="120" x="850" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="b_avail" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;verticalAlign=middle;" value="availability" vertex="1">
+          <mxGeometry height="50" width="100" x="1110" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="b_billing" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;verticalAlign=middle;" value="billing&#xa;(RBAC)" vertex="1">
+          <mxGeometry height="50" width="120" x="1230" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="b_staff" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;verticalAlign=middle;" value="staff&#xa;(RBAC)" vertex="1">
+          <mxGeometry height="50" width="100" x="990" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="b_summarize" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;verticalAlign=middle;fontStyle=1;" value="summarize&#xa;SYNTHESIS tier · evidence-only" vertex="1">
+          <mxGeometry height="60" width="280" x="900" y="600" as="geometry" />
+        </mxCell>
+        <mxCell id="b_end" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;verticalAlign=middle;" value="END" vertex="1">
+          <mxGeometry height="50" width="80" x="1000" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="be_safety_classify" edge="1" parent="1" source="b_safety" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="b_classify">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="be_classify_retrieve" edge="1" parent="1" source="b_classify" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="b_retrieve">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="be_classify_appts" edge="1" parent="1" source="b_classify" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="b_appts">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="be_classify_avail" edge="1" parent="1" source="b_classify" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="b_avail">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="be_classify_billing" edge="1" parent="1" source="b_classify" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="b_billing">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="be_classify_staff" edge="1" parent="1" source="b_classify" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="b_staff">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1040" y="370" />
+              <mxPoint x="1040" y="475" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="be_retrieve_sum" edge="1" parent="1" source="b_retrieve" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="b_summarize">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="780" y="550" />
+              <mxPoint x="928" y="550" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="be_appts_sum" edge="1" parent="1" source="b_appts" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="b_summarize">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="be_avail_sum" edge="1" parent="1" source="b_avail" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.7;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="b_summarize">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="be_billing_sum" edge="1" parent="1" source="b_billing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.9;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="b_summarize">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1290" y="550" />
+              <mxPoint x="1152" y="550" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="be_staff_sum" edge="1" parent="1" source="b_staff" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="b_summarize">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="be_sum_end" edge="1" parent="1" source="b_summarize" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=classic;" target="b_end">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note_ask" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;verticalAlign=middle;align=center;" value="No `schedule` branch — a misroute can never book/reschedule/cancel.&#xa;Both graphs share the same Postgres checkpointer, so a session can&#xa;interleave /ask and /agent turns on the same thread_id." vertex="1">
+          <mxGeometry height="60" width="1200" x="100" y="780" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

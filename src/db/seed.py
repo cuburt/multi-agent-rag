@@ -2,17 +2,64 @@ import uuid
 from datetime import datetime, timedelta
 from sqlmodel import Session
 from src.db.session import init_db, engine
-from src.db.models import Tenant, User, Document, Appointment, Claim
+from src.db.models import Tenant, User, Document, Appointment, Claim, Provider
 from src.rag.embeddings import get_embedding
+
+
+# Standard 5-day general schedule.
+_FULL_WEEK_HOURS = {
+    "mon": [["09:00", "12:00"], ["13:00", "17:00"]],
+    "tue": [["09:00", "12:00"], ["13:00", "17:00"]],
+    "wed": [["09:00", "12:00"], ["13:00", "17:00"]],
+    "thu": [["09:00", "12:00"], ["13:00", "17:00"]],
+    "fri": [["09:00", "13:00"]],
+}
+
+# Pediatric: 3 days/week.
+_PEDIATRIC_HOURS = {
+    "mon": [["10:00", "16:00"]],
+    "wed": [["10:00", "16:00"]],
+    "fri": [["10:00", "14:00"]],
+}
+
+
+def _seed_providers(session: Session) -> None:
+    """Backfills the Provider table on every seed_db() call. Older databases
+    were seeded before this table existed, so we run this independently of
+    the main seed block instead of forcing a wipe-and-reseed. Skips itself
+    cleanly if any Provider row already exists.
+    """
+    if session.query(Provider).first():
+        print("Providers already seeded — skipping.")
+        return
+
+    print("Seeding Providers...")
+    rows = [
+        Provider(
+            id="prov_1", tenant_id="tenant_1", name="Dr. Alice",
+            specialty="general", weekly_hours=_FULL_WEEK_HOURS, slot_minutes=30,
+        ),
+        Provider(
+            id="prov_2", tenant_id="tenant_1", name="Dr. Carol",
+            specialty="pediatric", weekly_hours=_PEDIATRIC_HOURS, slot_minutes=30,
+        ),
+        Provider(
+            id="prov_3", tenant_id="tenant_2", name="Dr. Bob",
+            specialty="general", weekly_hours=_FULL_WEEK_HOURS, slot_minutes=30,
+        ),
+    ]
+    session.add_all(rows)
+    session.commit()
+
 
 def seed_db():
     print("Initializing DB...")
     init_db()
-    
+
     with Session(engine) as session:
-        # Check if already seeded
         if session.query(Tenant).first():
-            print("DB already seeded.")
+            print("DB already seeded — running provider backfill only.")
+            _seed_providers(session)
             return
 
         print("Seeding Tenants...")
@@ -46,12 +93,9 @@ def seed_db():
 
         print("Seeding Documents...")
         docs = [
-            # Tenant 1 Docs
             {"t_id": "tenant_1", "title": "Cancellation Policy", "type": "policy", "content": "Patients must cancel at least 24 hours in advance to avoid a $50 cancellation fee."},
             {"t_id": "tenant_1", "title": "Insurance Guidelines", "type": "insurance", "content": "We accept Delta Dental and Cigna. Co-pays are due at the time of service. Claims are usually processed within 14 days."},
             {"t_id": "tenant_1", "title": "Post-Op Instructions: Filling", "type": "guideline", "content": "Avoid eating for 2 hours after a filling. If sensitivity persists beyond 3 days, contact the clinic."},
-            
-            # Tenant 2 Docs
             {"t_id": "tenant_2", "title": "Cancellation Policy", "type": "policy", "content": "Our cancellation policy requires 48 hours notice. Missed appointments incur a $75 fee."},
             {"t_id": "tenant_2", "title": "Insurance Guidelines", "type": "insurance", "content": "We are out-of-network for all insurances but will provide a superbill. Payment in full is expected at the time of visit."},
         ]
@@ -70,6 +114,8 @@ def seed_db():
             session.add(doc)
         
         session.commit()
+
+        _seed_providers(session)
         print("Seed complete.")
 
 if __name__ == "__main__":
