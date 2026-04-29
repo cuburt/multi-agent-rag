@@ -139,12 +139,10 @@ These are filterable in the Langfuse UI alongside latency/cost so you can chart,
 **What is NOT in Langfuse — and lives in the eval harness instead:** real retrieval quality (`hit@1`, `hit@3`), correctness vs an expected answer, and hallucination rate. These all require gold labels and so are computed offline by `evals/run_evals.py`. See "Evaluation" below.
 
 ### CI/CD & Rollback Plan
-- **CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)):** Two jobs run on every push and PR.
-  - `unit-tests` — spins up a `pgvector/pgvector:pg16` service container, installs `requirements.txt`, runs `pytest tests/` with **no LLM keys configured**. Unit tests deliberately don't hit a network — caching, RBAC routing, redaction, retrieval shape, and metrics aggregation are all exercised against stubs / a real DB.
-  - `integration-redteam` — depends on `unit-tests`, brings up the API against pgvector, seeds the DB, and runs `evals/red_team.py`. Gated on `OPENROUTER_API_KEY` being set as a repo secret; on forks (or with no secret) it skips cleanly so the unit-test job still gates merges.
-
-  The unit-test gate is **never** skipped, and the red-team job becomes a hard gate as soon as a maintainer adds the secret. This keeps CI fast and free for contributors while still letting maintainers block PRs that regress security behaviour.
-- **CD:** The Dockerfile in the repo root produces a single image used by the API and the Streamlit frontend. `docker compose up --build` brings up Postgres + API + frontend with one command (the `api` service runs the seed script before serving traffic, so a fresh deploy is never empty).
+- **CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)):** Runs unit-tests, integration-redteam, and release (Docker Hub push) jobs on push/PR.
+- **CD:** Automated deployment to **Google Cloud Run**.
+  - **Automated Seeding:** The container `CMD` is configured to run `python -m src.db.seed` before starting the API server, ensuring the Cloud SQL database is never empty.
+  - **Cloud SQL Connectivity:** Uses the Cloud SQL Auth Proxy Unix socket via a dynamically built `DATABASE_URL`.
 - **Caching ([`src/agents/graph.py`](../src/agents/graph.py)):** Per-tier in-memory TTL+LRU cache (default 256 entries) wrapped around `get_llm_response`. ROUTER 5 min (classifications are stable), SYNTHESIS 60 s (absorbs retries / re-asks), AGENTIC disabled (its prompts include the patient's live appointment list — caching would mask state drift). All TTLs are env-overridable (`LLM_CACHE_TTL_*_S`). Hits are logged as `llm_cache_hit` so cache effectiveness is visible in the structlog stream.
 - **Model rollback (no code change required):** The three primary models are env-driven (`ROUTER_MODEL`, `AGENTIC_MODEL`, `SYNTHESIS_MODEL`). To roll back a regressed model, edit `.env` and restart the container — the old version is one redeploy away. The hardcoded fallback chain in `MODEL_CHAINS` provides automatic in-flight rollback per call: a 5xx or rate-limit on the primary advances to the next model in the same tier, no human in the loop.
 - **Code rollback:** Tag every deployable build (`vYYYY.MM.DD-N`); rolling back is `docker compose pull && docker compose up -d` against the previous tag. State is in Postgres, which is migration-managed by `init_db()` (idempotent table creation + `CREATE EXTENSION IF NOT EXISTS vector`).

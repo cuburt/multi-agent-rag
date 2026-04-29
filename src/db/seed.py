@@ -53,11 +53,6 @@ def _seed_providers(session: Session) -> None:
 
 
 def seed_db():
-    print("Forcing schema refresh (dropping document table for 3072-dim upgrade)...")
-    with engine.connect() as conn:
-        conn.execute(text("DROP TABLE IF EXISTS document CASCADE"))
-        conn.commit()
-
     print("Initializing DB...")
     init_db()
 

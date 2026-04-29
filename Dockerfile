@@ -21,4 +21,4 @@ EXPOSE 8000
 
 # Honor $PORT so the same image runs under docker-compose (PORT=8000) and
 # Cloud Run (PORT injected by the platform, default 8080).
-CMD ["sh", "-c", "uvicorn src.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "python -m src.db.seed && uvicorn src.main:app --host 0.0.0.0 --port ${PORT}"]

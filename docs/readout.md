@@ -223,10 +223,11 @@ controls and run against a live API.
 
 ## 5. LLMOps
 
-- **CI:** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) brings up a pgvector
-  service and runs the unit-test suite on every push and PR. A second job runs the full
-  red-team pack against a real LLM provider when `OPENROUTER_API_KEY` is configured as a
-  secret; on forks it skips cleanly so the unit-test gate still blocks merge.
+- **CI/CD:** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) automates the entire lifecycle:
+  - **Test:** Unit tests + gated red-team pack.
+  - **Release:** Image push to Docker Hub.
+  - **Deploy:** Automated Google Cloud Run deployment.
+  - **Auto-Seed:** Container seeds Cloud SQL on startup.
 - **Caching:** Per-tier in-memory TTL cache (`src/agents/graph.py`). ROUTER 5 min,
   SYNTHESIS 60 s, AGENTIC disabled (its prompts include live appointment state). Sized
   to 256 entries with LRU eviction. TTLs are env-overridable.

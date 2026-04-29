@@ -91,9 +91,13 @@ python -m evals.red_team
 - [Diagrams](docs/diagrams/README.md) — draw.io source files for every system, graph, retrieval, model-tier, PHI-redaction, and observability diagram referenced from the docs above.
 - [Screenshots](docs/screenshots/README.md) — Streamlit UI, Swagger, and `/metrics` captures used in the executive readout. Regenerated via `scripts/capture-screenshots.py`.
 
-## CI
+## CI/CD
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
 
-- **`unit-tests`** — runs on every push/PR against a `pgvector/pgvector:pg16` service container. No LLM keys required; covers safety/redaction, RBAC routing, cache eviction, metrics aggregation. Always blocks merge on failure.
-- **`integration-redteam`** — gated on `OPENROUTER_API_KEY` being configured as a repo secret. Boots the API, seeds the DB, and runs `evals/red_team.py` end-to-end. Skips cleanly on forks so external contributors aren't blocked.
+- **`unit-tests`** — runs on every push/PR against a `pgvector/pgvector:pg16` service container.
+- **`integration-redteam`** — gated on `OPENROUTER_API_KEY`. Runs `evals/red_team.py`.
+- **`release`** — builds and pushes a Docker image to Docker Hub.
+- **`deploy`** — deploys to **Google Cloud Run** with automated environment setup.
+
+**Note on Seeding:** The `api` service automatically runs the mock seeding script (`python -m src.db.seed`) on startup in both local Docker and Cloud Run.
