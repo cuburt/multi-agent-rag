@@ -75,9 +75,10 @@ def test_chat_interaction(app):
     app.session_state["messages"] = [{"role": "assistant", "content": "Hello!"}]
     app.run()
     
-    # Enter a chat message
+    # Enter a chat message — live API call can take up to 120s (matching the
+    # httpx timeout in frontend/app.py), so override the default 30s AppTest timeout.
     test_query = "What is the cancellation policy?"
-    app.chat_input[0].set_value(test_query).run()
+    app.chat_input[0].set_value(test_query).run(timeout=120)
     
     assert not app.exception
     
