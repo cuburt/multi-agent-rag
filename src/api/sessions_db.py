@@ -11,6 +11,7 @@ from typing import Optional
 
 from fastapi import HTTPException
 from sqlmodel import Session
+from sqlalchemy import text
 
 from src.db.session import engine
 from src.db.models import Conversation, User
@@ -56,6 +57,35 @@ def resolve_user_profile(tenant_id: str, user_id: str) -> Optional[dict]:
         if user is None or user.tenant_id != tenant_id:
             return None
         return user.model_dump()
+
+
+def delete_session_index(session_id: str, tenant_id: str, user_id: str) -> None:
+    """Remove the Conversation index row and LangGraph checkpoints after verifying ownership."""
+    with Session(engine) as session:
+        convo = session.get(Conversation, session_id)
+        if convo is None:
+            raise HTTPException(status_code=404, detail="Session not found")
+        if convo.tenant_id != tenant_id or convo.user_id != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Session does not belong to this tenant/user.",
+            )
+        session.delete(convo)
+        session.commit()
+
+    # Clean up LangGraph checkpoint data. Delete in dependency order so FK
+    # constraints (if any) don't block. Each delete is in its own connection
+    # so a missing table never rolls back the Conversation delete above.
+    for table in ("checkpoint_writes", "checkpoint_blobs", "checkpoints"):
+        try:
+            with engine.connect() as conn:
+                conn.execute(
+                    text(f"DELETE FROM {table} WHERE thread_id = :tid"),  # noqa: S608
+                    {"tid": session_id},
+                )
+                conn.commit()
+        except Exception:
+            pass
 
 
 def assert_session_owner(session_id: str, tenant_id: str, user_id: str) -> None:

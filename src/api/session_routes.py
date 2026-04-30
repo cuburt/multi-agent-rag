@@ -10,6 +10,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 from src.agents.graph import agent_app
 from src.db.session import engine
 from src.db.models import Conversation, User
+from src.api.sessions_db import delete_session_index
 
 router = APIRouter()
 
@@ -76,6 +77,16 @@ def list_sessions(
                 for r in rows
             ]
         }
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+def delete_session(
+    session_id: str,
+    tenant_id: str = Query(...),
+    user_id: str = Query(...),
+):
+    """Delete a session and all its LangGraph checkpoint data."""
+    delete_session_index(session_id, tenant_id, user_id)
 
 
 @router.get("/sessions/{session_id}")

@@ -50,6 +50,20 @@ def _list_users(tenant_id: str, role: Optional[str] = None) -> list[dict]:
         return []
 
 
+def _delete_session(session_id: str, tenant_id: str, user_id: str) -> bool:
+    try:
+        r = httpx.delete(
+            f"{API_URL}/sessions/{session_id}",
+            params={"tenant_id": tenant_id, "user_id": user_id},
+            timeout=15.0,
+        )
+        r.raise_for_status()
+        return True
+    except Exception as e:
+        st.error(f"Could not delete session: {e}")
+        return False
+
+
 def _list_sessions(tenant_id: str, user_id: str) -> list[dict]:
     try:
         r = httpx.get(
@@ -373,15 +387,18 @@ if "session_id" not in st.session_state:
         sid = s["session_id"]
         title = s["title"] or "(untitled)"
         when = s["updated_at"][:19].replace("T", " ")
-        # Whole-row clickable: a single full-width button whose label carries
-        # both title and timestamp. Streamlit buttons render markdown in
-        # labels, so the two-line look comes from `  \n` (markdown linebreak).
-        if st.button(
-            f"**{title}**  \n`{sid[:8]}…` · {when}",
-            key=f"open_{sid}",
-            use_container_width=True,
-        ):
-            _request_session_load(sid)
+        col_open, col_del = st.columns([0.88, 0.12])
+        with col_open:
+            if st.button(
+                f"**{title}**  \n`{sid[:8]}…` · {when}",
+                key=f"open_{sid}",
+                use_container_width=True,
+            ):
+                _request_session_load(sid)
+        with col_del:
+            if st.button("🗑️", key=f"del_{sid}", use_container_width=True, help="Delete session"):
+                if _delete_session(sid, filter_tenant, filter_user):
+                    st.rerun()
 
     st.stop()
 
@@ -438,13 +455,22 @@ with st.sidebar:
             label = (
                 f"{'➡️ ' if is_current else ''}**{title}**  \n`{sid[:8]}…` · {when}"
             )
-            if st.button(
-                label,
-                key=f"sb_open_{sid}",
-                disabled=is_current,
-                use_container_width=True,
-            ):
-                _request_session_load(sid)
+            col_open, col_del = st.columns([0.8, 0.2])
+            with col_open:
+                if st.button(
+                    label,
+                    key=f"sb_open_{sid}",
+                    disabled=is_current,
+                    use_container_width=True,
+                ):
+                    _request_session_load(sid)
+            with col_del:
+                if st.button("🗑️", key=f"sb_del_{sid}", use_container_width=True, help="Delete"):
+                    ok = _delete_session(sid, st.session_state.tenant_id, st.session_state.patient_id)
+                    if ok and is_current:
+                        _end_session()
+                    elif ok:
+                        st.rerun()
 
 
 # --- Chat transcript ---
