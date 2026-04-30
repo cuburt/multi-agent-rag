@@ -46,7 +46,7 @@ def on_startup():
     # table migrations. Both are idempotent so calling them every boot is fine.
     checkpoint_pool.open()
     checkpointer.setup()
-    logger.info("Application startup complete.")
+    logger.info("application_startup_complete")
 
 
 @app.on_event("shutdown")
