@@ -279,7 +279,7 @@ def run_once() -> list[dict]:
 
         start = time.time()
         try:
-            resp = httpx.post(f"{API_URL}{endpoint}", json=payload, timeout=60.0)
+            resp = httpx.post(f"{API_URL}{endpoint}", json=payload, timeout=300.0)
             data = resp.json()
         except Exception as e:
             print(f"  API call failed: {e}")
