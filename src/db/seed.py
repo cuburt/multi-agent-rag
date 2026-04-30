@@ -1,7 +1,6 @@
-import uuid
 import os
 from datetime import datetime, timedelta
-from sqlmodel import Session, text
+from sqlmodel import Session, select
 from src.db.session import init_db, engine
 from src.db.models import Tenant, User, Document, Appointment, Claim, Provider
 from src.rag.embeddings import get_embedding
@@ -25,7 +24,7 @@ _PEDIATRIC_HOURS = {
 
 
 def _seed_providers(session: Session) -> None:
-    if session.query(Provider).first():
+    if session.exec(select(Provider)).first():
         print("Providers already seeded — skipping.")
         return
 
@@ -57,24 +56,23 @@ def seed_db():
     init_db()
 
     with Session(engine) as session:
-        if session.query(Tenant).first():
+        if session.exec(select(Tenant)).first():
             print("DB Tenants already seeded — checking Providers.")
             _seed_providers(session)
-            # If documents were dropped, we need to re-seed them even if tenants exist
-            if not session.query(Document).first():
+            if not session.exec(select(Document)).first():
                 print("Documents missing — proceeding to seed documents.")
             else:
                 print("Documents already exist — skipping main seed.")
                 return
 
-        if not session.query(Tenant).first():
+        if not session.exec(select(Tenant)).first():
             print("Seeding Tenants...")
             t1 = Tenant(id="tenant_1", name="Smile Clinic")
             t2 = Tenant(id="tenant_2", name="Bright Dental")
             session.add_all([t1, t2])
             session.commit()
 
-        if not session.query(User).first():
+        if not session.exec(select(User)).first():
             print("Seeding Users...")
             users = [
                 User(id="u_patient_1", tenant_id="tenant_1", name="John Doe", role="patient"),
@@ -89,7 +87,7 @@ def seed_db():
         else:
             print("Users already seeded — skipping.")
 
-        if not session.query(Appointment).first():
+        if not session.exec(select(Appointment)).first():
             print("Seeding Appointments & Claims...")
             now = datetime.now()
             session.add_all([
@@ -105,6 +103,11 @@ def seed_db():
             session.commit()
         else:
             print("Appointments & Claims already seeded — skipping.")
+
+        if session.exec(select(Document)).first():
+            print("Documents already exist — skipping.")
+            _seed_providers(session)
+            return
 
         print("Seeding Documents...")
         docs = [
