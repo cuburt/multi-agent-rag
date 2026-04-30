@@ -106,20 +106,20 @@ The split is **runtime → Langfuse, ground-truth quality → eval harness, sing
 
 **Runtime observability (Langfuse):** A `langfuse.callback.CallbackHandler` is attached to every graph invocation in `src/api/agent_routes.py`. Out of the box this gives:
 
-| Metric | Source |
-|---|---|
-| End-to-end trace latency | `trace.latency` |
-| Per-LLM-call latency (planner / scheduler / summarizer) | `observation.latency` per node |
-| Tokens (prompt / completion) | LiteLLM usage forwarded by the handler |
-| Cost (USD) | Computed by Langfuse from token + model |
-| Error / success per call | Trace status |
-| Trace replay (full prompt + completion) | Langfuse trace UI |
+| Metric | Source                                                     |
+|---|------------------------------------------------------------|
+| End-to-end trace latency | `trace.latency`                                            |
+| Per-LLM-call latency (planner / scheduler / summarizer) | `observation.latency` per node                             |
+| Tokens (prompt / completion) | LiteLLM usage forwarded by the handler                     |
+| Cost (USD) | Computed by Langfuse from token + model                    |
+| Error / success per call | Trace status                                               |
+| Trace replay (full prompt + completion) | Langfuse trace UI                                          |
 | Per-tenant filtering | Trace tags `tenant:<id>` and `role:<role>` set in the handler |
-| Per-route filtering | Trace tag `route:<retrieve|billing|schedule|summarize>` |
+| Per-route filtering | Trace tags `route:<retrieve\|billing\|schedule\|summarize>`|
 
 **Custom Langfuse scores** are pushed onto every trace after `agent_app.invoke()` finishes:
 
-| Score | Meaning |
+| Score | Meaning |~~~~
 |---|---|
 | `documents_retrieved` | Number of doc citations on the response (RAG depth proxy) |
 | `citations_count` | Total citations of any kind on the response |
