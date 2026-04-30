@@ -9,6 +9,7 @@ on:
       - '**/*.png'
       - '**/*.drawio'
       - '**/*.txt'
+      - '**/*.yml'
   pull_request:
     branches: [main]
     paths-ignore:
@@ -16,6 +17,7 @@ on:
       - '**/*.png'
       - '**/*.drawio'
       - '**/*.txt'
+      - '**/*.yml'
 
 jobs:
   unit-tests:
