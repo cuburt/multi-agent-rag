@@ -22,7 +22,7 @@
         <mxCell id="rbac_note" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;verticalAlign=middle;align=center;" value="Role allow-list&#xa;patient → policy / insurance / guideline&#xa;staff, admin → all doc_types" vertex="1">
           <mxGeometry height="60" width="280" x="290" y="275" as="geometry" />
         </mxCell>
-        <mxCell id="emb" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;verticalAlign=middle;" value="get_embedding()&#xa;litellm + 768-dim vector&#xa;(deterministic mock fallback)" vertex="1">
+        <mxCell id="emb" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;verticalAlign=middle;" value="get_embedding()&#xa;GenAI SDK + 3072-dim vector&#xa;(deterministic mock fallback)" vertex="1">
           <mxGeometry height="70" width="280" x="290" y="355" as="geometry" />
         </mxCell>
         <mxCell id="vec" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;verticalAlign=middle;" value="Vector search&#xa;pgvector L2 distance&#xa;LIMIT top_k * 2" vertex="1">

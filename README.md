@@ -72,7 +72,7 @@ curl 'http://localhost:8000/metrics?window_minutes=60' | jq
 ## Testing & Evaluation
 
 ```bash
-# Unit tests (no DB / LLM required)
+# Unit and Holistic tests (Streamlit UI tests hit the deployed API)
 pytest tests/
 
 # Correctness + hallucination evals (requires running API)
@@ -95,9 +95,10 @@ python -m evals.red_team
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
 
-- **`unit-tests`** — runs on every push/PR against a `pgvector/pgvector:pg16` service container.
-- **`integration-redteam`** — gated on `OPENROUTER_API_KEY`. Runs `evals/red_team.py`.
-- **`release`** — builds and pushes a Docker image to Docker Hub.
-- **`deploy`** — deploys to **Google Cloud Run** with automated environment setup.
+- **`unit-tests`** — runs on every push/PR against a `pgvector/pgvector:pg16` service container. Includes holistic frontend UI tests.
+- **`evals-redteam`** — gated on `OPENROUTER_API_KEY`. Runs `evals/red_team.py` in parallel.
+- **`evals-run`** — gated on `OPENROUTER_API_KEY`. Runs standard eval suites (`evals/run_evals.py`) in parallel.
+- **`release`** — builds and pushes a Docker image to Docker Hub on main push.
+- **`deploy`** — deploys API and Streamlit Frontend to **Google Cloud Run** with automated environment setup.
 
 **Note on Seeding:** The `api` service automatically runs the mock seeding script (`python -m src.db.seed`) on startup in both local Docker and Cloud Run.

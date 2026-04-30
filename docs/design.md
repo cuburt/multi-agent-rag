@@ -20,7 +20,7 @@ The system is built as a multi-agent orchestration service exposing an API.
   - `agent_app` (backs `POST /agent`): `Safety -> Planner -> (Retriever | Billing | Scheduler) -> Summarizer -> END` — full multi-tool flow, used when the request may need billing or scheduling.
   - `ask_app` (backs `POST /ask`): `Safety -> Retriever -> Summarizer -> END` — lean grounded-Q&A flow that skips the planner, drops the billing/scheduling tools, and is therefore one fewer LLM call, doc-grounded only, and incapable of mutating billing or scheduling state.
   Both graphs share the same checkpointer + state shape, so a session can interleave `/ask` and `/agent` turns on the same `thread_id` without losing history. In either flow the LLM cannot invoke an unplanned tool or loop.
-- **LLM Integration:** LiteLLM is used as an abstraction layer so any provider can be plugged in. The defaults shipped in `.env.example` route to free-tier OpenRouter models (Llama 3.2/3.3, GPT-OSS, Hermes 3, Nemotron); embeddings default to `gemini/text-embedding-004` with a deterministic 768-dim mock fallback in `src/rag/embeddings.py` for offline/test runs.
+- **LLM Integration:** LiteLLM is used as an abstraction layer so any provider can be plugged in. The defaults shipped in `.env.example` route to free-tier OpenRouter models (Llama 3.2/3.3, GPT-OSS, Hermes 3, Nemotron); embeddings default to `gemini-embedding-2` via the Google GenAI SDK with a deterministic 3072-dim mock fallback in `src/rag/embeddings.py` for offline/test runs.
 
 ## Retrieval Strategy (RAG Core)
 
@@ -31,7 +31,7 @@ The system is built as a multi-agent orchestration service exposing an API.
 - **Metadata Filters:** All three filters described in the requirements are applied *before* ranking: `tenant_id` (mandatory), `doc_type` (optional), and `effective_after` (optional, with `IS NULL OR effective_date >= X` so undated docs aren't dropped).
 - **RBAC Retrieval Shaping:** The caller's `user_role` further narrows the doc_type set — `patient` callers can only see `policy`, `insurance`, `guideline`; `staff` and `admin` see everything. This is enforced inside the SQL `WHERE` clause, so the LLM never has the option of leaking a doc type the role isn't entitled to.
 - **Evidence-First Prompting:** The summarizer is instructed to answer *only* from the scratchpad and to fall back to "I don't have enough information to answer that." when context is insufficient. Every final answer carries at least one citation — RAG paths cite document IDs, billing/scheduling paths cite claim/appointment IDs, and the tool-free greeting path uses an explicit "No external sources used" sentinel.
-- **Embedding Resilience:** Embedding calls go through `litellm` wrapped in a tenacity retry (3 attempts, exponential backoff). On total failure the system falls back to a deterministic seeded 768-dim vector so seeding and offline development never block on a flaky model endpoint.
+- **Embedding Resilience:** Embedding calls default to the native Google GenAI SDK (or `litellm` for OpenAI) wrapped in a tenacity retry (3 attempts, exponential backoff). On total failure the system falls back to a deterministic seeded 3072-dim vector so seeding and offline development never block on a flaky model endpoint.
 
 ## Multi-Tenancy & Security Model
 
@@ -104,7 +104,7 @@ On top of the fallback chain, each individual model invocation is wrapped in a t
 
 The split is **runtime → Langfuse, ground-truth quality → eval harness, single read surface → `GET /metrics`.** Langfuse stores the trace stream produced by every API call; `/metrics` proxies a recent window of those traces into a simple JSON rollup so an operator (or a Prometheus scraper, with a small adapter) can read req counts, p95 latency, error rate, tokens/cost, and our custom RAG/PHI scores without opening the Langfuse UI. Real `hit@k` is intentionally NOT computed at runtime — it needs gold labels — so `/metrics` ALSO surfaces the most recent saved `evals/baseline.json` summary as `retrieval_quality`.
 
-**Runtime observability (Langfuse):** A `langfuse.callback.CallbackHandler` is attached to every graph invocation in `src/main.py`. Out of the box this gives:
+**Runtime observability (Langfuse):** A `langfuse.callback.CallbackHandler` is attached to every graph invocation in `src/api/agent_routes.py`. Out of the box this gives:
 
 | Metric | Source |
 |---|---|
@@ -139,7 +139,7 @@ These are filterable in the Langfuse UI alongside latency/cost so you can chart,
 **What is NOT in Langfuse — and lives in the eval harness instead:** real retrieval quality (`hit@1`, `hit@3`), correctness vs an expected answer, and hallucination rate. These all require gold labels and so are computed offline by `evals/run_evals.py`. See "Evaluation" below.
 
 ### CI/CD & Rollback Plan
-- **CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)):** Runs unit-tests, integration-redteam, and release (Docker Hub push) jobs on push/PR.
+- **CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)):** Runs unit-tests, evals-redteam, evals-run, and release (Docker Hub push) jobs on push/PR.
 - **CD:** Automated deployment to **Google Cloud Run**.
   - **Automated Seeding:** The container `CMD` is configured to run `python -m src.db.seed` before starting the API server, ensuring the Cloud SQL database is never empty.
   - **Cloud SQL Connectivity:** Uses the Cloud SQL Auth Proxy Unix socket via a dynamically built `DATABASE_URL`.
