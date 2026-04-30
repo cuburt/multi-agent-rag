@@ -6,6 +6,15 @@ from streamlit.testing.v1 import AppTest
 # Use the deployed API URL for holistic end-to-end testing, matching scratch/holistic_test.py
 API_URL = "https://multi-agent-rag-41721004602.us-central1.run.app"
 
+@pytest.fixture(scope="session", autouse=True)
+def warmup_api():
+    """Ping the deployed API to wake it up from Cloud Run scale-to-zero."""
+    import httpx
+    try:
+        httpx.get(f"{API_URL}/tenants", timeout=60.0)
+    except Exception as e:
+        print(f"Warning: API warmup failed: {e}")
+
 @pytest.fixture
 def app():
     os.environ["API_URL"] = API_URL
