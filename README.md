@@ -1,7 +1,7 @@
 # Multi-Agent Dental Practice RAG Assistant
 
 A prototype multi-tenant, PHI-aware assistant for a dental practice platform
-using RAG-grounded LLMs and LangGraph orchestration. You can access the deployed app here: [Streamlit App](https://multi-agent-frontend-41721004602.us-central1.run.app) [OpenAPI](https://multi-agent-rag-41721004602.us-central1.run.app/docs)
+using RAG-grounded LLMs and LangGraph orchestration. You can access the deployed app here: [Streamlit App](https://multi-agent-frontend-41721004602.us-central1.run.app) [OpenAPI](https://multi-agent-rag-41721004602.us-central1.run.app/docs). Or shoot me an email at balanon.cuburt@gmail.com for [Langfuse](https://jp.cloud.langfuse.com/project/cmohhzwzb009cad07m6qh0f53) access.
 
 ## Features
 - **Hybrid RAG:** `pgvector` L2 distance + Postgres full-text search merged via reciprocal rank fusion, with hard `tenant_id`, optional `doc_type` and `effective_date` filtering.
