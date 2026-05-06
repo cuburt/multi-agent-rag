@@ -247,6 +247,7 @@ checkpoint_pool = ConnectionPool(
     conninfo=_DB_URI,
     max_size=10,
     open=False,
+    check=ConnectionPool.check_connection,
     kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
 )
 checkpointer = PostgresSaver(conn=checkpoint_pool)
